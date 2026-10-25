@@ -1,0 +1,51 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# C extensions
+*.obj
+*.o
+*.a
+*.lib
+
+# Environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+.env
+
+# Large Datasets & Archives
+archive/
+archive.zip
+*.zip
+*.tar
+*.tar.gz
+*.rar
+
+# Training Output, Intermediate Logs & Runs
+runs/
+
+# Base Pretrained Weights (downloadable automatically via Ultralytics)
+yolo11n.pt
+yolov8n.pt
+
+# Superseded/Duplicate Model Checkpoints
+hybrid_model/models/efficientnet_best.pth
+
+# WebApp Runtime Uploads & Generated Outputs
+webapp/backend/uploads/*
+!webapp/backend/uploads/.gitkeep
+
+# IDEs & System files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,14 @@
+path: C:/Users/SURESH BABU/OneDrive/Desktop/CoffeebeanDefect/archive/datasets
+train: train
+val: valid
+
+names:
+  0: BLACK
+  1: BROKEN
+  2: BROWN
+  3: BigBroken
+  4: IMMATURE
+  5: INSECT
+  6: MOLD
+  7: PartlyBlack
+  8: LIGHTFM_HEAVYFM

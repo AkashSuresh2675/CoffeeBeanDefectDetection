@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coffee Bean Defect Detection System</title>
+    <!-- Google Fonts & Font Awesome Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="navbar">
+            <div class="brand">
+                <div class="brand-icon">
+                    <i class="fa-solid fa-mug-hot"></i>
+                </div>
+                <div class="brand-text">
+                    <h1>Coffee Bean Defect Detection System</h1>
+                    <p class="subtitle">AI-Powered Quality Assessment & Defect Classification</p>
+                </div>
+            </div>
+            <div class="pipeline-badge">
+                <div class="status-indicator online"></div>
+                <div class="pipeline-info">
+                    <span class="pipeline-title"><i class="fa-solid fa-diagram-project"></i> Pipeline Architecture</span>
+                    <span class="pipeline-stages">
+                        <strong class="stage-active">Stage 1: YOLO11 Detector</strong> → 
+                        <strong class="stage-active" style="background: rgba(46, 204, 113, 0.2); color: #2ecc71; padding: 2px 8px; border-radius: 4px;">Stage 2: EfficientNet-B0 Classifier (Active)</strong>
+                    </span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <main class="main-content">
+            <!-- Control & Upload Panel (Left Column) -->
+            <section class="panel upload-panel">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-cloud-arrow-up"></i> Upload Sample Image</h2>
+                    <p>Drag & drop a coffee bean image or select a file to run defect analysis.</p>
+                </div>
+
+                <!-- Dropzone Area -->
+                <div class="dropzone" id="dropzone">
+                    <input type="file" id="fileInput" accept="image/*" class="file-input">
+                    <div class="dropzone-content" id="dropzoneContent">
+                        <div class="upload-icon-wrapper">
+                            <i class="fa-solid fa-seedling upload-icon"></i>
+                        </div>
+                        <p class="upload-title">Drop your coffee bean photo here</p>
+                        <p class="upload-subtitle">Supports JPG, PNG, WEBP, BMP</p>
+                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">
+                            <i class="fa-solid fa-folder-open"></i> Browse Files
+                        </button>
+                    </div>
+
+                    <!-- Image Preview Overlay -->
+                    <div class="preview-container hidden" id="previewContainer">
+                        <img id="imagePreview" src="" alt="Selected sample preview">
+                        <button type="button" class="btn-remove" id="btnRemoveImage" title="Remove Image">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                        <div class="preview-overlay-info">
+                            <span id="fileNameDisplay"><i class="fa-solid fa-file-image"></i> image.jpg</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detection Settings & Action -->
+                <div class="controls-group">
+                    <div class="confidence-slider-group">
+                        <div class="slider-label">
+                            <span><i class="fa-solid fa-sliders"></i> Confidence Threshold:</span>
+                            <span id="confValueDisplay" class="badge badge-primary">15%</span>
+                        </div>
+                        <input type="range" id="confSlider" min="5" max="90" value="15" step="5">
+                    </div>
+
+                    <button type="button" class="btn btn-primary btn-analyze" id="btnAnalyze" disabled>
+                        <span class="btn-text"><i class="fa-solid fa-wand-magic-sparkles"></i> Analyze Image</span>
+                        <div class="spinner hidden" id="spinner"></div>
+                    </button>
+                </div>
+
+                <!-- Hybrid Pipeline Workflow Card -->
+                <div class="pipeline-workflow-card">
+                    <div class="workflow-header">
+                        <i class="fa-solid fa-network-wired"></i> <span>Hybrid Architecture Workflow</span>
+                    </div>
+                    <div class="workflow-steps">
+                        <div class="step-item">
+                            <span class="step-num">1</span>
+                            <div class="step-details">
+                                <strong>YOLO11</strong>
+                                <small>Bean Detection</small>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right step-arrow"></i>
+                        <div class="step-item">
+                            <span class="step-num">2</span>
+                            <div class="step-details">
+                                <strong>Crop</strong>
+                                <small>Bean Region</small>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right step-arrow"></i>
+                        <div class="step-item">
+                            <span class="step-num">3</span>
+                            <div class="step-details">
+                                <strong>EfficientNet-B0</strong>
+                                <small>Classification</small>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right step-arrow"></i>
+                        <div class="step-item step-final">
+                            <span class="step-num"><i class="fa-solid fa-check"></i></span>
+                            <div class="step-details">
+                                <strong>Defect Result</strong>
+                                <small>Final Output</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results Panel (Right Column) -->
+            <section class="panel results-panel">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-chart-pie"></i> Defect Analysis Results</h2>
+                    <p>Real-time bean counts, confidence scores, and bounding box visualizations.</p>
+                </div>
+
+                <!-- Initial Empty State -->
+                <div class="empty-state" id="emptyState">
+                    <div class="empty-icon"><i class="fa-solid fa-microscope"></i></div>
+                    <h3>No Analysis Conducted Yet</h3>
+                    <p>Upload a coffee bean sample on the left panel and click <strong>Analyze Image</strong> to generate detailed defect detection reports.</p>
+                </div>
+
+                <!-- Active Results Section -->
+                <div class="results-container hidden" id="resultsContainer">
+                    <!-- Key Metric Cards -->
+                    <div class="metrics-grid">
+                        <div class="metric-card metric-total">
+                            <div class="metric-icon"><i class="fa-solid fa-wheat-awn"></i></div>
+                            <div class="metric-data">
+                                <span class="metric-value" id="metricTotalBeans">0</span>
+                                <span class="metric-label">Total Beans Detected</span>
+                            </div>
+                        </div>
+
+                        <div class="metric-card metric-types">
+                            <div class="metric-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                            <div class="metric-data">
+                                <span class="metric-value" id="metricDefectTypes">0</span>
+                                <span class="metric-label">Defect Categories</span>
+                            </div>
+                        </div>
+
+                        <div class="metric-card metric-quality">
+                            <div class="metric-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                            <div class="metric-data">
+                                <span class="metric-value" id="metricAvgConfidence">0%</span>
+                                <span class="metric-label">Avg Confidence</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Visual Comparison & Tab Controls -->
+                    <div class="visualizer-card">
+                        <div class="tab-bar">
+                            <button class="tab-btn active" data-target="annotatedView">
+                                <i class="fa-solid fa-crosshairs"></i> Annotated Detection View
+                            </button>
+                            <button class="tab-btn" data-target="originalView">
+                                <i class="fa-solid fa-image"></i> Original Image
+                            </button>
+                        </div>
+                        <div class="image-viewport">
+                            <div class="view-pane active" id="annotatedView">
+                                <img id="annotatedImage" src="" alt="YOLO11 + EfficientNet-B0 Hybrid Detection Output">
+                            </div>
+                            <div class="view-pane" id="originalView">
+                                <img id="originalImage" src="" alt="Original Uploaded Sample">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Defect Category Breakdown Badges -->
+                    <div class="section-block">
+                        <h3><i class="fa-solid fa-tags"></i> Class Summary</h3>
+                        <div class="class-summary-tags" id="classSummaryTags">
+                            <!-- Class badges rendered dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Detailed Detections Table -->
+                    <div class="section-block">
+                        <h3><i class="fa-solid fa-list-check"></i> Individual Detections</h3>
+                        <div class="table-wrapper">
+                            <table class="detections-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Defect Class</th>
+                                        <th>Confidence</th>
+                                        <th>Bounding Box (xmin, ymin, xmax, ymax)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="detectionsTableBody">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Coffee Bean Defect Detection System &bull; Powered by YOLO11 + EfficientNet-B0 Hybrid Model & Flask &bull; Modular Pipeline Architecture</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
