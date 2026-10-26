@@ -198,6 +198,10 @@ def serve_upload(filename):
 def serve_index():
     return send_from_directory(FRONTEND_FOLDER, 'index.html')
 
+@app.route('/dashboard')
+def serve_dashboard():
+    return send_from_directory(FRONTEND_FOLDER, 'dashboard.html')
+
 @app.route('/<path:filename>')
 def serve_frontend_assets(filename):
     if os.path.exists(os.path.join(FRONTEND_FOLDER, filename)):

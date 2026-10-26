@@ -22,17 +22,21 @@
                     <i class="fa-solid fa-mug-hot"></i>
                 </div>
                 <div class="brand-text">
-                    <h1>Coffee Bean Defect Detection System</h1>
+                    <h1>Coffee Bean AI</h1>
                     <p class="subtitle">AI-Powered Quality Assessment & Defect Classification</p>
                 </div>
             </div>
+            <nav class="nav-links">
+                <a href="/" class="nav-link active"><i class="fa-solid fa-microscope"></i> Image Inspection</a>
+                <a href="/dashboard" class="nav-link"><i class="fa-solid fa-chart-pie"></i> Analysis Dashboard</a>
+            </nav>
             <div class="pipeline-badge">
                 <div class="status-indicator online"></div>
                 <div class="pipeline-info">
                     <span class="pipeline-title"><i class="fa-solid fa-diagram-project"></i> Pipeline Architecture</span>
                     <span class="pipeline-stages">
-                        <strong class="stage-active">Stage 1: YOLO11 Detector</strong> → 
-                        <strong class="stage-active" style="background: var(--confirmed-bg); color: var(--confirmed-color); padding: 2px 8px; border-radius: 4px;">Stage 2: EfficientNet-B0 Classifier (Active)</strong>
+                        <strong class="stage-active">Stage 1: YOLO11</strong> → 
+                        <strong class="stage-active" style="background: var(--confirmed-bg); color: var(--confirmed-color); padding: 2px 8px; border-radius: 4px;">Stage 2: EfficientNet-B0</strong>
                     </span>
                 </div>
             </div>
@@ -144,9 +148,14 @@
 
             <!-- Results Panel (Right Column) -->
             <section class="panel results-panel">
-                <div class="panel-header">
-                    <h2><i class="fa-solid fa-chart-pie"></i> Defect Analysis Results</h2>
-                    <p>Real-time bean counts, confidence scores, and bounding box visualizations.</p>
+                <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                    <div>
+                        <h2><i class="fa-solid fa-chart-pie"></i> Defect Analysis Results</h2>
+                        <p>Real-time bean counts, confidence scores, and bounding box visualizations.</p>
+                    </div>
+                    <a href="/dashboard" id="btnViewDashboard" class="btn btn-primary hidden" style="font-size: 0.8rem; text-decoration: none; padding: 0.45rem 0.85rem;">
+                        <i class="fa-solid fa-chart-column"></i> View Full Dashboard &rarr;
+                    </a>
                 </div>
 
                 <!-- Initial Empty State -->

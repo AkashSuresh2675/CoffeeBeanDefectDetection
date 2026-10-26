@@ -240,6 +240,25 @@ document.addEventListener('DOMContentLoaded', () => {
             // 6. Reset filters and populate table
             resetTableFilters();
             renderFilteredTable();
+
+            // 7. Save to sessionStorage for Analysis Dashboard page
+            try {
+                sessionStorage.setItem('coffeeAnalysis', JSON.stringify({
+                    data: data,
+                    elapsedMs: elapsedMs,
+                    yoloThresh: confSlider ? confSlider.value : '25',
+                    effnetThresh: effnetConfSlider ? effnetConfSlider.value : '50',
+                    sampleName: selectedFile ? selectedFile.name : 'Sample'
+                }));
+            } catch (e) {
+                console.warn('Could not save to sessionStorage:', e);
+            }
+
+            // 8. Show View Dashboard button
+            const btnViewDashboard = document.getElementById('btnViewDashboard');
+            if (btnViewDashboard) {
+                btnViewDashboard.classList.remove('hidden');
+            }
         }
 
         // Distribution Chart Rendering

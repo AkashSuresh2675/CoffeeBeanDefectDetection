@@ -1,0 +1,231 @@
+﻿<!DOCTYPE html>
+<html lang=en>
+<head>
+    <meta charset=UTF-8>
+    <meta name=viewport content=width=device-width, initial-scale=1.0>
+    <title>Analysis Dashboard - Coffee Bean Defect Detection</title>
+    <!-- Google Fonts & Font Awesome Icons -->
+    <link rel=preconnect href=https://fonts.googleapis.com>
+    <link rel=preconnect href=https://fonts.gstatic.com crossorigin>
+    <link href=https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap rel=stylesheet>
+    <link rel=stylesheet href=https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css>
+    <!-- Chart.js for Academic Distribution Chart -->
+    <script src=https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js></script>
+    <link rel=stylesheet href=style.css>
+</head>
+<body>
+    <div class=app-container>
+        <!-- Top Navigation Bar -->
+        <header class=navbar>
+            <div class=brand>
+                <div class=brand-icon>
+                    <i class=fa-solid fa-mug-hot></i>
+                </div>
+                <div class=brand-text>
+                    <h1>Coffee Bean AI</h1>
+                    <p class=subtitle>AI-Powered Quality Assessment & Defect Classification</p>
+                </div>
+            </div>
+            <nav class=nav-links>
+                <a href=/ class=nav-link><i class=fa-solid fa-microscope></i> Image Inspection</a>
+                <a href=/dashboard class=nav-link active><i class=fa-solid fa-chart-pie></i> Analysis Dashboard</a>
+            </nav>
+            <div class=pipeline-badge>
+                <div class=status-indicator online></div>
+                <div class=pipeline-info>
+                    <span class=pipeline-title><i class=fa-solid fa-diagram-project></i> Pipeline Architecture</span>
+                    <span class=pipeline-stages>
+                        <strong class=stage-active>Stage 1: YOLO11</strong> → 
+                        <strong class=stage-active style=background: var(--confirmed-bg); color: var(--confirmed-color); padding: 2px 8px; border-radius: 4px;>Stage 2: EfficientNet-B0</strong>
+                    </span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content: Full-Width Dashboard -->
+        <main class=dashboard-main>
+            <!-- Initial Empty State if No Analysis in sessionStorage -->
+            <div class=panel empty-state id=dashboardEmptyState>
+                <div class=empty-icon><i class=fa-solid fa-folder-open></i></div>
+                <h3>No Analysis Data Available</h3>
+                <p>Run an image defect analysis on the <strong>Image Inspection</strong> page first. Results will automatically appear here for deep review.</p>
+                <a href=/ class=btn btn-primary style=margin-top: 0.5rem; text-decoration: none;>
+                    <i class=fa-solid fa-arrow-left></i> Go to Image Inspection
+                </a>
+            </div>
+
+            <!-- Active Dashboard View -->
+            <div class=panel dashboard-container hidden id=dashboardContainer>
+                <div class=panel-header style=display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;>
+                    <div>
+                        <h2><i class=fa-solid fa-chart-column></i> Defect Analysis Dashboard</h2>
+                        <p>Complete statistical breakdown, class distribution, and per-bean inspection table.</p>
+                    </div>
+                    <div style=display: flex; gap: 0.5rem;>
+                        <a href=/ class=btn btn-secondary style=font-size: 0.78rem; text-decoration: none;>
+                            <i class=fa-solid fa-arrow-left></i> New Inspection
+                        </a>
+                        <button type=button class=btn btn-secondary id=btnExportCsv style=font-size: 0.78rem;>
+                            <i class=fa-solid fa-file-csv></i> Export CSV
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 4 Stat Cards -->
+                <div class=metrics-grid>
+                    <div class=metric-card mc-total>
+                        <div class=metric-icon><i class=fa-solid fa-wheat-awn></i></div>
+                        <div class=metric-data>
+                            <span class=metric-value id=metricTotalBeans>0</span>
+                            <span class=metric-label>Total Beans</span>
+                        </div>
+                    </div>
+                    <div class=metric-card mc-confirmed>
+                        <div class=metric-icon><i class=fa-solid fa-circle-check></i></div>
+                        <div class=metric-data>
+                            <span class=metric-value id=metricConfirmed>0</span>
+                            <span class=metric-label>Confirmed</span>
+                        </div>
+                    </div>
+                    <div class=metric-card mc-uncertain>
+                        <div class=metric-icon><i class=fa-solid fa-triangle-exclamation></i></div>
+                        <div class=metric-data>
+                            <span class=metric-value id=metricUncertain>0</span>
+                            <span class=metric-label>Uncertain</span>
+                        </div>
+                    </div>
+                    <div class=metric-card mc-time>
+                        <div class=metric-icon><i class=fa-solid fa-stopwatch></i></div>
+                        <div class=metric-data>
+                            <span class=metric-value id=metricProcessingTime>0 ms</span>
+                            <span class=metric-label>Elapsed Time</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hybrid Model Info Panel -->
+                <div class=model-info-panel>
+                    <div class=info-row>
+                        <div class=info-tag>
+                            <i class=fa-solid fa-microchip text-muted></i>
+                            <span>Detector: <strong>YOLO11 Stage 2 (640)</strong></span>
+                        </div>
+                        <div class=info-tag>
+                            <i class=fa-solid fa-sliders text-muted></i>
+                            <span>YOLO Conf: <strong id=infoYoloThresh>--</strong></span>
+                        </div>
+                        <div class=info-tag>
+                            <i class=fa-solid fa-brain text-muted></i>
+                            <span>Classifier: <strong>EfficientNet-B0 Improved</strong></span>
+                        </div>
+                        <div class=info-tag>
+                            <i class=fa-solid fa-sliders text-muted></i>
+                            <span>EffNet Conf: <strong id=infoEffnetThresh>--</strong></span>
+                        </div>
+                        <div class=info-tag>
+                            <i class=fa-solid fa-image text-muted></i>
+                            <span>Sample: <strong id=infoSampleName>--</strong></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2-Column Split: Image Viewer + Chart -->
+                <div class=dashboard-split-grid>
+                    <!-- Image Viewer -->
+                    <div class=image-viewer-card>
+                        <div class=viewer-tabs>
+                            <button type=button class=tab-btn active data-target=viewAnnotated>
+                                <i class=fa-solid fa-bullseye></i> Annotated Detections
+                            </button>
+                            <button type=button class=tab-btn data-target=viewOriginal>
+                                <i class=fa-solid fa-image></i> Original Image
+                            </button>
+                        </div>
+                        <div class=viewer-content>
+                            <div class=view-pane active id=viewAnnotated>
+                                <img id=annotatedImage src=" alt=Annotated Detections>
+ </div>
+ <div class=view-pane id=viewOriginal>
+ <img id=originalImage src= alt=Original Image>
+ </div>
+ </div>
+ </div>
+
+ <!-- Chart & Summary Badges -->
+ <div class=chart-summary-card>
+ <div class=chart-header>
+ <span class=chart-title><i class=fa-solid fa-chart-simple></i> Defect Class Distribution</span>
+ <span class=chart-subtitle>EfficientNet-B0 Predicted Classes</span>
+ </div>
+ <div class=chart-wrapper>
+ <canvas id=defectChart></canvas>
+ </div>
+ <div class=summary-section style=margin-top: 0.5rem;>
+ <div class=section-title><i class=fa-solid fa-tags></i> Category Breakdown</div>
+ <div class=summary-badges id=summaryBadges></div>
+ </div>
+ </div>
+ </div>
+
+ <!-- Interactive Detections Table -->
+ <div class=detections-section>
+ <div class=section-title><i class=fa-solid fa-list-check></i> Individual Detections</div>
+ <div class=table-controls>
+ <div class=control-field search-field>
+ <i class=fa-solid fa-magnifying-glass></i>
+ <input type=text id=tableSearchInput placeholder=Search by class name...>
+ </div>
+ <div class=control-field filter-field>
+ <label for=tableStatusFilter><i class=fa-solid fa-filter></i> Status:</label>
+ <select id=tableStatusFilter>
+ <option value=all>All</option>
+ <option value=confirmed>Confirmed Only</option>
+ <option value=uncertain>Uncertain Only</option>
+ </select>
+ </div>
+ <div class=control-field sort-field>
+ <label for=tableSortSelect><i class=fa-solid fa-arrow-down-wide-short></i> Sort:</label>
+ <select id=tableSortSelect>
+ <option value=id_asc>ID (Low → High)</option>
+ <option value=id_desc>ID (High → Low)</option>
+ <option value=conf_desc>Confidence (High → Low)</option>
+ <option value=conf_asc>Confidence (Low → High)</option>
+ <option value=class_asc>Class (A → Z)</option>
+ </select>
+ </div>
+ <button type=button class=btn btn-secondary id=btnResetFilters title=Reset Filters>
+ <i class=fa-solid fa-rotate-left></i> Reset
+ </button>
+ </div>
+
+ <div class=table-wrapper>
+ <table class=detections-table id=detectionsTable>
+ <thead>
+ <tr>
+ <th># ID</th>
+ <th>Predicted Class</th>
+ <th>EffNet Conf</th>
+ <th>YOLO Conf</th>
+ <th>Status</th>
+ <th>Bounding Box [x1, y1, x2, y2]</th>
+ </tr>
+ </thead>
+ <tbody id=detectionsTableBody>
+ <!-- Populated dynamically -->
+ </tbody>
+ </table>
+ </div>
+ </div>
+ </div>
+ </main>
+
+ <!-- Footer -->
+ <footer class=footer>
+ <p>BTech CSE Capstone Project &bull; Hybrid Architecture: YOLO11 Object Detector + EfficientNet-B0 Classifier</p>
+ </footer>
+ </div>
+
+ <!-- Script -->
+ <script src=dashboard.js></script>
+</body>
+</html>
