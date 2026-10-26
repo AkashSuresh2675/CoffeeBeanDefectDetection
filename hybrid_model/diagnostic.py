@@ -23,7 +23,11 @@ def run_diagnostic():
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    yolo_path = os.path.join(project_root, "runs", "detect", "runs", "detect", "yolo11_9class_corrected", "weights", "best.pt")
+    yolo_path = os.path.join(project_root, "hybrid_model", "models", "yolo11_stage2_best.pt")
+    if not os.path.exists(yolo_path):
+        yolo_path = os.path.join(project_root, "runs", "detect", "runs", "detect", "yolo11_stage2_640", "weights", "best.pt")
+    if not os.path.exists(yolo_path):
+        yolo_path = os.path.join(project_root, "runs", "detect", "runs", "detect", "yolo11_9class_corrected", "weights", "best.pt")
     if not os.path.exists(yolo_path):
         yolo_path = os.path.join(project_root, "runs", "detect", "train-5", "weights", "best.pt")
     

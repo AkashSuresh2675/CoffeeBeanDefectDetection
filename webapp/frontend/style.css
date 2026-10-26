@@ -678,6 +678,126 @@ input[type="range"] {
     background: rgba(212, 163, 115, 0.05);
 }
 
+/* Model Information Panel */
+.model-info-panel {
+    background: rgba(43, 30, 22, 0.6);
+    border: 1px solid var(--bg-card-border);
+    border-radius: var(--radius-md);
+    padding: 0.65rem 1rem;
+}
+
+.info-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1.25rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.info-tag {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.info-tag i {
+    color: var(--primary-coffee);
+}
+
+.info-tag strong {
+    color: var(--text-primary);
+}
+
+.section-header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+/* Table Controls Bar & Toolbar */
+.table-controls-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem;
+    margin: 0.85rem 0;
+    padding: 0.65rem;
+    background: rgba(18, 13, 10, 0.45);
+    border: 1px solid var(--bg-card-border);
+    border-radius: var(--radius-sm);
+}
+
+.filter-input-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 170px;
+}
+
+.filter-input-wrap i {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    pointer-events: none;
+}
+
+.filter-input-wrap input {
+    width: 100%;
+    padding: 0.5rem 0.75rem 0.5rem 2rem;
+    background: var(--bg-dark);
+    border: 1px solid var(--bg-card-border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.82rem;
+    outline: none;
+    transition: var(--transition-fast);
+}
+
+.filter-input-wrap input:focus {
+    border-color: var(--primary-coffee);
+    box-shadow: 0 0 8px rgba(212, 163, 115, 0.2);
+}
+
+.filter-select-wrap select {
+    padding: 0.5rem 0.85rem;
+    background: var(--bg-dark);
+    border: 1px solid var(--bg-card-border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.82rem;
+    outline: none;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.filter-select-wrap select:focus {
+    border-color: var(--primary-coffee);
+    box-shadow: 0 0 8px rgba(212, 163, 115, 0.2);
+}
+
+.btn-sm {
+    padding: 0.45rem 0.9rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.btn-sm:hover {
+    filter: brightness(1.15);
+}
+
+.btn-sm:focus-visible {
+    outline: 2px solid var(--primary-coffee);
+    outline-offset: 2px;
+}
+
 /* Utility Classes */
 .hidden {
     display: none !important;

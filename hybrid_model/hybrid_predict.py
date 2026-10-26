@@ -120,15 +120,17 @@ class HybridCoffeePredictor:
             )
         ])
 
-    def predict(self, image_path, conf_threshold=0.25, iou_threshold=0.45, imgsz=640):
+    def predict(self, image_path, conf_threshold=0.25, iou_threshold=0.45, imgsz=640, effnet_conf_threshold=0.50, batch_size=16):
         """
-        Executes the hybrid prediction pipeline on an input image.
+        Executes the hybrid prediction pipeline on an input image with batched classifier inference.
         
         Args:
             image_path (str): Path to input image file.
             conf_threshold (float): Confidence threshold for YOLO detection.
             iou_threshold (float): IoU/NMS threshold for YOLO detection.
             imgsz (int): Image size resolution for YOLO inference (default: 640).
+            effnet_conf_threshold (float): Confidence threshold for EfficientNet classification (default: 0.50).
+            batch_size (int): Max batch size for EfficientNet crop classification (default: 16).
             
         Returns:
             results (list of dicts): Detection & classification details for every detected bean.
@@ -156,97 +158,128 @@ class HybridCoffeePredictor:
         boxes_data = yolo_results[0].boxes
 
         hybrid_results = []
+        if boxes_data is None or len(boxes_data) == 0:
+            return hybrid_results, annotated_bgr
 
-        if boxes_data is not None and len(boxes_data) > 0:
-            for idx, box in enumerate(boxes_data):
-                # Coordinates
-                xyxy = [float(v) for v in box.xyxy[0].tolist()]
-                x1, y1, x2, y2 = xyxy
-                yolo_conf = float(box.conf[0].item())
-                yolo_cls_id = int(box.cls[0].item())
-                yolo_cls_name = yolo_results[0].names.get(yolo_cls_id, f"Class_{yolo_cls_id}")
+        # Step 2: Bounding Box Image Patch Cropping & Batch Preparation
+        crop_entries = []
+        for idx, box in enumerate(boxes_data):
+            xyxy = [float(v) for v in box.xyxy[0].tolist()]
+            x1, y1, x2, y2 = xyxy
+            yolo_conf = float(box.conf[0].item())
+            yolo_cls_id = int(box.cls[0].item())
+            yolo_cls_name = yolo_results[0].names.get(yolo_cls_id, f"Class_{yolo_cls_id}")
 
-                # Step 2: Bounding Box Image Patch Cropping
-                crop_x1 = max(0, int(x1))
-                crop_y1 = max(0, int(y1))
-                crop_x2 = min(img_w, int(x2))
-                crop_y2 = min(img_h, int(y2))
+            crop_x1 = max(0, int(x1))
+            crop_y1 = max(0, int(y1))
+            crop_x2 = min(img_w, int(x2))
+            crop_y2 = min(img_h, int(y2))
 
-                crop_bgr = img_bgr[crop_y1:crop_y2, crop_x1:crop_x2]
+            crop_bgr = img_bgr[crop_y1:crop_y2, crop_x1:crop_x2]
+            is_valid = crop_bgr.size > 0 and crop_bgr.shape[0] > 2 and crop_bgr.shape[1] > 2
 
+            crop_entries.append({
+                'idx': idx,
+                'xyxy': [x1, y1, x2, y2],
+                'coords': (crop_x1, crop_y1, crop_x2, crop_y2),
+                'yolo_conf': yolo_conf,
+                'yolo_cls_id': yolo_cls_id,
+                'yolo_cls_name': yolo_cls_name,
+                'crop_bgr': crop_bgr if is_valid else None,
+                'is_valid': is_valid
+            })
+
+        # Preprocess valid crops for batched EfficientNet inference
+        valid_indices = [i for i, entry in enumerate(crop_entries) if entry['is_valid']]
+        valid_tensors = []
+        for i in valid_indices:
+            crop_rgb = cv2.cvtColor(crop_entries[i]['crop_bgr'], cv2.COLOR_BGR2RGB)
+            pil_crop = Image.fromarray(crop_rgb)
+            valid_tensors.append(self.transform(pil_crop))
+
+        # Batched EfficientNet-B0 Inference
+        effnet_preds = {}
+        if valid_tensors:
+            num_valid = len(valid_tensors)
+            for start_idx in range(0, num_valid, batch_size):
+                end_idx = min(start_idx + batch_size, num_valid)
+                batch_tensor = torch.stack(valid_tensors[start_idx:end_idx]).to(self.device)
+                
+                with torch.inference_mode():
+                    outputs = self.effnet_model(batch_tensor)
+                    probs = torch.softmax(outputs, dim=1)
+                    top_probs, top_indices = torch.max(probs, dim=1)
+
+                for b_sub, v_idx in enumerate(range(start_idx, end_idx)):
+                    real_crop_idx = valid_indices[v_idx]
+                    top_p = float(top_probs[b_sub].item())
+                    top_id = int(top_indices[b_sub].item())
+                    top_name = self.class_names[top_id] if top_id < len(self.class_names) else f"Class_{top_id}"
+                    effnet_preds[real_crop_idx] = (top_name, top_p, top_id)
+
+        # Step 3: Combine YOLO + EfficientNet Predictions with Confidence Disambiguation
+        for idx, entry in enumerate(crop_entries):
+            x1, y1, x2, y2 = entry['xyxy']
+            crop_x1, crop_y1, crop_x2, crop_y2 = entry['coords']
+            yolo_conf = entry['yolo_conf']
+            yolo_cls_name = entry['yolo_cls_name']
+
+            if idx in effnet_preds:
+                eff_class_name, eff_conf, eff_class_id = effnet_preds[idx]
+                is_uncertain = eff_conf < effnet_conf_threshold
+            else:
+                # Fallback for invalid/empty crops
                 eff_class_name = yolo_cls_name
                 eff_conf = yolo_conf
-                eff_class_id = yolo_cls_id
+                eff_class_id = entry['yolo_cls_id']
+                is_uncertain = True
 
-                # Step 3: EfficientNet-B0 Classification on Cropped Patch
-                if crop_bgr.size > 0 and crop_bgr.shape[0] > 2 and crop_bgr.shape[1] > 2:
-                    try:
-                        crop_rgb = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2RGB)
-                        pil_crop = Image.fromarray(crop_rgb)
-                        input_tensor = self.transform(pil_crop).unsqueeze(0).to(self.device)
+            final_label = f"Uncertain ({eff_class_name})" if is_uncertain else eff_class_name
 
-                        with torch.no_grad():
-                            outputs = self.effnet_model(input_tensor)
-                            probs = torch.softmax(outputs, dim=1)
-                            top_prob, top_idx = torch.max(probs, dim=1)
+            record = {
+                'bean_id': idx + 1,
+                'yolo_confidence': round(yolo_conf * 100, 1),
+                'yolo_class': yolo_cls_name,
+                'effnet_classification': eff_class_name,
+                'effnet_confidence': round(eff_conf * 100, 1),
+                'final_result': final_label,
+                'is_uncertain': is_uncertain,
+                'confidence_score': round(eff_conf, 4),
+                'bbox': [round(x1, 2), round(y1, 2), round(x2, 2), round(y2, 2)]
+            }
+            hybrid_results.append(record)
 
-                            eff_conf = float(top_prob.item())
-                            eff_class_id = int(top_idx.item())
-                            if eff_class_id < len(self.class_names):
-                                eff_class_name = self.class_names[eff_class_id]
-                    except Exception as err:
-                        print(f"[WARNING] Crop classification error on bean #{idx+1}: {err}")
+            # Step 4: Draw Clean, Non-Intrusive Bounding Box & Label Tag
+            img_max_dim = max(img_w, img_h)
+            scale = max(0.8, img_max_dim / 1600.0)
+            box_thickness = max(2, int(round(scale * 1.5)))
+            font_scale = max(0.40, round(scale * 0.38, 2))
+            font_thickness = max(1, int(round(scale * 0.9)))
 
-                # Build detection record preserving both YOLO and EfficientNet outputs
-                record = {
-                    'bean_id': idx + 1,
-                    'yolo_confidence': round(yolo_conf * 100, 1),
-                    'yolo_class': yolo_cls_name,
-                    'effnet_classification': eff_class_name,
-                    'effnet_confidence': round(eff_conf * 100, 1),
-                    'final_result': eff_class_name,
-                    'confidence_score': round(eff_conf, 4),
-                    'bbox': [round(x1, 2), round(y1, 2), round(x2, 2), round(y2, 2)]
-                }
-                hybrid_results.append(record)
+            box_color = (128, 128, 128) if is_uncertain else CLASS_COLOR_MAP.get(eff_class_name, (0, 220, 100))
+            cv2.rectangle(annotated_bgr, (crop_x1, crop_y1), (crop_x2, crop_y2), box_color, box_thickness)
 
-                # Step 4: Draw Clean, Non-Intrusive Bounding Box & Label Tag
-                # Scale-aware dynamic sizing for high-res images (e.g. 2560x1920)
-                img_max_dim = max(img_w, img_h)
-                scale = max(0.8, img_max_dim / 1600.0)
-                box_thickness = max(2, int(round(scale * 1.5)))
-                font_scale = max(0.40, round(scale * 0.38, 2))
-                font_thickness = max(1, int(round(scale * 0.9)))
+            badge_text = f"#{idx+1} {final_label} {int(eff_conf * 100)}%"
+            (font_w, font_h), baseline = cv2.getTextSize(badge_text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_thickness)
 
-                box_color = CLASS_COLOR_MAP.get(eff_class_name, (0, 220, 100))
-                
-                # Draw rounded rectangle outline for bean
-                cv2.rectangle(annotated_bgr, (crop_x1, crop_y1), (crop_x2, crop_y2), box_color, box_thickness)
+            pad_x = int(4 * scale)
+            pad_y = int(3 * scale)
 
-                # Compact tag text
-                label_text = f"#{idx+1} {eff_class_name} {int(eff_conf * 100)}%"
-                (font_w, font_h), baseline = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_thickness)
+            tag_y2 = crop_y1 - 2
+            tag_y1 = tag_y2 - font_h - (pad_y * 2)
+            if tag_y1 < 0:
+                tag_y1 = crop_y1 + 2
+                tag_y2 = tag_y1 + font_h + (pad_y * 2)
 
-                pad_x = int(4 * scale)
-                pad_y = int(3 * scale)
+            tag_x1 = crop_x1
+            tag_x2 = min(img_w, crop_x1 + font_w + (pad_x * 2))
 
-                # Position label tag cleanly above or inside box top edge
-                tag_y2 = crop_y1 - 2
-                tag_y1 = tag_y2 - font_h - (pad_y * 2)
-                if tag_y1 < 0:
-                    tag_y1 = crop_y1 + 2
-                    tag_y2 = tag_y1 + font_h + (pad_y * 2)
+            cv2.rectangle(annotated_bgr, (tag_x1, tag_y1), (tag_x2, tag_y2), box_color, -1)
+            cv2.rectangle(annotated_bgr, (tag_x1, tag_y1), (tag_x2, tag_y2), (20, 20, 20), 1)
 
-                tag_x1 = crop_x1
-                tag_x2 = min(img_w, crop_x1 + font_w + (pad_x * 2))
-
-                # Background badge with dark border
-                cv2.rectangle(annotated_bgr, (tag_x1, tag_y1), (tag_x2, tag_y2), box_color, -1)
-                cv2.rectangle(annotated_bgr, (tag_x1, tag_y1), (tag_x2, tag_y2), (20, 20, 20), 1)
-
-                text_x = tag_x1 + pad_x
-                text_y = tag_y2 - pad_y - baseline // 2
-                cv2.putText(annotated_bgr, label_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), font_thickness, cv2.LINE_AA)
+            text_x = tag_x1 + pad_x
+            text_y = tag_y2 - pad_y - baseline // 2
+            cv2.putText(annotated_bgr, badge_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), font_thickness, cv2.LINE_AA)
 
         return hybrid_results, annotated_bgr
 

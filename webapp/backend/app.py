@@ -66,11 +66,11 @@ load_models()
 # ==============================================================================
 # PIPELINE: YOLO11 Bounding Box Detection -> Crop Bean -> EfficientNet-B0 Classification
 # ==============================================================================
-def run_hybrid_pipeline(image_path, conf_threshold=0.25, iou_threshold=0.45, imgsz=640):
+def run_hybrid_pipeline(image_path, conf_threshold=0.25, iou_threshold=0.45, imgsz=640, effnet_conf_threshold=0.50):
     """
     Executes the 2-Stage Hybrid Coffee Bean Defect Detection Pipeline using HybridCoffeePredictor.
     - Detector: YOLO11 stage2 at 640 resolution (outputs yolo_class, confidence, bbox)
-    - Classifier: EfficientNet-B0 fine defect classifier (outputs effnet_class, confidence)
+    - Classifier: EfficientNet-B0 fine defect classifier (outputs effnet_class, confidence, is_uncertain)
     """
     global hybrid_predictor
     if hybrid_predictor is None:
@@ -80,7 +80,8 @@ def run_hybrid_pipeline(image_path, conf_threshold=0.25, iou_threshold=0.45, img
         image_path,
         conf_threshold=conf_threshold,
         iou_threshold=iou_threshold,
-        imgsz=imgsz
+        imgsz=imgsz,
+        effnet_conf_threshold=effnet_conf_threshold
     )
 
     # Format detections payload for Flask API response
@@ -96,6 +97,7 @@ def run_hybrid_pipeline(image_path, conf_threshold=0.25, iou_threshold=0.45, img
             'effnet_confidence': round(item['effnet_confidence'] / 100.0, 4),
             'yolo_confidence': round(item['yolo_confidence'] / 100.0, 4),
             'yolo_class': item['yolo_class'],
+            'is_uncertain': item.get('is_uncertain', False),
             'bbox': item['bbox']
         })
 
@@ -108,8 +110,8 @@ def run_hybrid_pipeline(image_path, conf_threshold=0.25, iou_threshold=0.45, img
 def predict():
     """
     POST /predict
-    Receives image upload and confidence threshold parameter, runs the YOLO11 -> 
-    Crop -> EfficientNet-B0 hybrid pipeline, and returns JSON analysis results.
+    Receives image upload, detector confidence, and classifier confidence thresholds,
+    runs the YOLO11 -> Crop -> EfficientNet-B0 hybrid pipeline, and returns JSON analysis results.
     """
     if 'file' not in request.files and 'image' not in request.files:
         return jsonify({'error': 'No image file provided in request'}), 400
@@ -133,6 +135,7 @@ def predict():
 
     try:
         conf_threshold = float(request.form.get('confidence', 0.25))
+        effnet_conf_threshold = float(request.form.get('effnet_confidence', 0.50))
         iou_threshold = float(request.form.get('iou', 0.45))
         imgsz = int(request.form.get('imgsz', 640))
 
@@ -141,7 +144,8 @@ def predict():
             upload_path,
             conf_threshold=conf_threshold,
             iou_threshold=iou_threshold,
-            imgsz=imgsz
+            imgsz=imgsz,
+            effnet_conf_threshold=effnet_conf_threshold
         )
 
         # Save annotated image result
