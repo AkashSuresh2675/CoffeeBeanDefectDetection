@@ -279,16 +279,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         {
                             label: 'Confirmed',
                             data: labels.length > 0 ? confirmedData : [0],
-                            backgroundColor: 'rgba(46, 204, 113, 0.75)',
-                            borderColor: '#2ecc71',
+                            backgroundColor: 'rgba(112, 196, 154, 0.7)',
+                            borderColor: '#70C49A',
                             borderWidth: 1,
                             borderRadius: 4
                         },
                         {
                             label: 'Uncertain',
                             data: labels.length > 0 ? uncertainData : [0],
-                            backgroundColor: 'rgba(230, 126, 34, 0.75)',
-                            borderColor: '#e67e22',
+                            backgroundColor: 'rgba(230, 160, 75, 0.7)',
+                            borderColor: '#E6A04B',
                             borderWidth: 1,
                             borderRadius: 4
                         }
@@ -414,17 +414,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     const yoloPct = det.yolo_confidence !== undefined ? `${Math.round(det.yolo_confidence * 100)}%` : 'N/A';
                     const isUncertain = det.is_uncertain === true;
 
-                    const statusBadge = isUncertain 
-                        ? `<span class="badge" style="background: rgba(230, 126, 34, 0.2); color: #e67e22; border: 1px solid rgba(230, 126, 34, 0.5); font-size: 0.72rem; padding: 2px 6px;">Uncertain</span>`
-                        : `<span class="badge" style="background: rgba(46, 204, 113, 0.2); color: #2ecc71; border: 1px solid rgba(46, 204, 113, 0.5); font-size: 0.72rem; padding: 2px 6px;">Confirmed</span>`;
+                    const statusBadge = isUncertain
+                        ? `<span class="status-badge status-uncertain"><i class="fa-solid fa-circle-question"></i> Uncertain</span>`
+                        : `<span class="status-badge status-confirmed"><i class="fa-solid fa-circle-check"></i> Confirmed</span>`;
 
                     row.innerHTML = `
                         <td><strong>${det.id}</strong></td>
-                        <td><span class="badge" style="font-size:0.75rem">${det.class}</span></td>
+                        <td><span class="class-badge">${det.class}</span></td>
                         <td><strong>${effnetPct}</strong></td>
                         <td><span>${yoloPct}</span></td>
                         <td>${statusBadge}</td>
-                        <td><code style="font-size:0.75rem; letter-spacing:-0.02em;">${bboxStr}</code></td>
+                        <td class="bbox-cell">${bboxStr}</td>
                     `;
                     detectionsTableBody.appendChild(row);
                 });
