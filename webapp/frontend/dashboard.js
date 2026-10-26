@@ -43,32 +43,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const infoEffnetThresh = document.getElementById('infoEffnetThresh');
     const infoSampleName = document.getElementById('infoSampleName');
 
-    const annotatedImage = document.getElementById('annotatedImage');
-    const originalImage = document.getElementById('originalImage');
-    const tabBtns = document.querySelectorAll('.tab-btn');
-
     let currentDetections = data.detections || [];
     let chartInstance = null;
-
-    // Tab Switching for Images
-    tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            tabBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-
-            const targetId = btn.dataset.target;
-            document.querySelectorAll('.view-pane').forEach(pane => {
-                pane.classList.remove('active');
-            });
-            const targetPane = document.getElementById(targetId);
-            if (targetPane) targetPane.classList.add('active');
-        });
-    });
 
     // 1. Metric Cards
     const totalCount = data.total_detections || currentDetections.length;
     const uncertainCount = currentDetections.filter(d => d.is_uncertain === true).length;
     const confirmedCount = totalCount - uncertainCount;
+
+    const confirmedPct = totalCount > 0 ? ((confirmedCount / totalCount) * 100).toFixed(1) : '0.0';
+    const uncertainPct = totalCount > 0 ? ((uncertainCount / totalCount) * 100).toFixed(1) : '0.0';
 
     if (metricTotalBeans) metricTotalBeans.textContent = totalCount;
     if (metricConfirmed) metricConfirmed.textContent = confirmedCount;
@@ -77,291 +61,187 @@ document.addEventListener('DOMContentLoaded', () => {
         metricProcessingTime.textContent = elapsedMs >= 1000 ? `${(elapsedMs / 1000).toFixed(2)}s` : `${elapsedMs} ms`;
     }
 
+    const metricConfirmedPct = document.getElementById('metricConfirmedPct');
+    const metricUncertainPct = document.getElementById('metricUncertainPct');
+    if (metricConfirmedPct) metricConfirmedPct.textContent = `${confirmedPct}%`;
+    if (metricUncertainPct) metricUncertainPct.textContent = `${uncertainPct}%`;
+
     // 2. Hybrid Model Info Panel
     if (infoYoloThresh) infoYoloThresh.textContent = `${yoloThresh}%`;
     if (infoEffnetThresh) infoEffnetThresh.textContent = `${effnetThresh}%`;
     if (infoSampleName) infoSampleName.textContent = sampleName;
 
-    // 3. Image URLs
-    if (annotatedImage && data.annotated_image_url) {
-        annotatedImage.src = `${data.annotated_image_url}?t=${Date.now()}`;
-    }
-    if (originalImage && data.original_image_url) {
-        originalImage.src = `${data.original_image_url}?t=${Date.now()}`;
-    }
+    // 3. Render Stacked Distribution Chart
+    renderSummaryChart(currentDetections);
 
-    // 4. Render Distribution Chart
-    renderDistributionChart(currentDetections);
+    // 4. Render Class-Wise Counts & Percentages Table
+    renderClassBreakdownTable(currentDetections, totalCount);
 
-    // 5. Render Badges
-    renderSummaryBadges(data.class_counts);
+    // 5. Render Confidence Summary Metrics
+    renderConfidenceSummary(currentDetections);
 
-    // 6. Interactive Table Controls
-    const tableSearchInput = document.getElementById('tableSearchInput');
-    const tableStatusFilter = document.getElementById('tableStatusFilter');
-    const tableSortSelect = document.getElementById('tableSortSelect');
-    const btnResetFilters = document.getElementById('btnResetFilters');
-    const btnExportCsv = document.getElementById('btnExportCsv');
+    function renderSummaryChart(detections) {
+        const chartCanvas = document.getElementById('defectSummaryChart');
+        if (!chartCanvas || typeof Chart === 'undefined') return;
 
-        // Distribution Chart Rendering
-        function renderDistributionChart(detections) {
-            const chartCanvas = document.getElementById('distributionChart');
-            if (!chartCanvas) return;
+        if (chartInstance) {
+            chartInstance.destroy();
+            chartInstance = null;
+        }
 
-            if (chartInstance) {
-                chartInstance.destroy();
-                chartInstance = null;
+        const classMap = {};
+        detections.forEach(det => {
+            const cls = det.effnet_class || det.class || 'Unknown';
+            if (!classMap[cls]) {
+                classMap[cls] = { confirmed: 0, uncertain: 0 };
             }
+            if (det.is_uncertain) {
+                classMap[cls].uncertain += 1;
+            } else {
+                classMap[cls].confirmed += 1;
+            }
+        });
 
-            // Count per class, separating confirmed and uncertain consistently
-            const classMap = {};
-            detections.forEach(det => {
-                const cls = det.effnet_class || det.class;
-                if (!classMap[cls]) {
-                    classMap[cls] = { confirmed: 0, uncertain: 0 };
-                }
-                if (det.is_uncertain) {
-                    classMap[cls].uncertain += 1;
-                } else {
-                    classMap[cls].confirmed += 1;
-                }
-            });
+        const labels = Object.keys(classMap);
+        const confirmedData = labels.map(l => classMap[l].confirmed);
+        const uncertainData = labels.map(l => classMap[l].uncertain);
 
-            const labels = Object.keys(classMap);
-            const confirmedData = labels.map(l => classMap[l].confirmed);
-            const uncertainData = labels.map(l => classMap[l].uncertain);
-
-            const ctx = chartCanvas.getContext('2d');
-            chartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels.length > 0 ? labels : ['No Detections'],
-                    datasets: [
-                        {
-                            label: 'Confirmed',
-                            data: labels.length > 0 ? confirmedData : [0],
-                            backgroundColor: 'rgba(112, 196, 154, 0.7)',
-                            borderColor: '#70C49A',
-                            borderWidth: 1,
-                            borderRadius: 4
-                        },
-                        {
-                            label: 'Uncertain',
-                            data: labels.length > 0 ? uncertainData : [0],
-                            backgroundColor: 'rgba(230, 160, 75, 0.7)',
-                            borderColor: '#E6A04B',
-                            borderWidth: 1,
-                            borderRadius: 4
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            labels: {
-                                color: '#B8A495',
-                                font: { family: 'Outfit', size: 11 }
-                            }
-                        },
-                        tooltip: {
-                            callbacks: {
-                                footer: (items) => {
-                                    let sum = 0;
-                                    items.forEach(i => sum += i.raw);
-                                    return `Total for class: ${sum}`;
-                                }
-                            }
+        const ctx = chartCanvas.getContext('2d');
+        chartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels.length > 0 ? labels : ['No Detections'],
+                datasets: [
+                    {
+                        label: 'Confirmed',
+                        data: confirmedData.length > 0 ? confirmedData : [0],
+                        backgroundColor: '#70C49A',
+                        borderColor: 'rgba(112, 196, 154, 0.8)',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    },
+                    {
+                        label: 'Uncertain',
+                        data: uncertainData.length > 0 ? uncertainData : [0],
+                        backgroundColor: '#E6A04B',
+                        borderColor: 'rgba(230, 160, 75, 0.8)',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            color: '#F2E8DC',
+                            font: { family: 'Outfit', size: 11 },
+                            boxWidth: 12
                         }
                     },
-                    scales: {
-                        x: {
-                            stacked: true,
-                            ticks: { color: '#B8A495', font: { family: 'Outfit', size: 10 } },
-                            grid: { color: 'rgba(212, 163, 115, 0.08)' }
-                        },
-                        y: {
-                            stacked: true,
-                            beginAtZero: true,
-                            ticks: { color: '#B8A495', precision: 0, font: { family: 'Outfit', size: 10 } },
-                            grid: { color: 'rgba(212, 163, 115, 0.08)' }
-                        }
+                    tooltip: {
+                        backgroundColor: '#201711',
+                        titleColor: '#D6A56F',
+                        bodyColor: '#F2E8DC',
+                        borderColor: '#453326',
+                        borderWidth: 1
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: true,
+                        ticks: { color: '#B09A88', font: { family: 'Outfit', size: 10 } },
+                        grid: { display: false }
+                    },
+                    y: {
+                        stacked: true,
+                        beginAtZero: true,
+                        ticks: { precision: 0, color: '#B09A88', font: { family: 'Outfit', size: 10 } },
+                        grid: { color: 'rgba(69, 51, 38, 0.4)' }
                     }
                 }
-            });
-        }
+            }
+        });
+    }
 
-        // Summary Badges
-        function renderSummaryBadges(classCounts) {
-            classSummaryTags.innerHTML = '';
-            if (classCounts && Object.keys(classCounts).length > 0) {
-                for (const [cls, count] of Object.entries(classCounts)) {
-                    const badge = document.createElement('div');
-                    const isUncertain = cls.startsWith('Uncertain');
-                    badge.className = `badge ${isUncertain ? 'badge-uncertain' : ''}`;
-                    if (isUncertain) {
-                        badge.style.background = 'rgba(230, 126, 34, 0.15)';
-                        badge.style.borderColor = 'rgba(230, 126, 34, 0.4)';
-                        badge.style.color = '#e67e22';
-                    }
-                    badge.innerHTML = `
-                        <span>${cls}</span>
-                        <span class="badge-count">${count}</span>
-                    `;
-                    classSummaryTags.appendChild(badge);
-                }
+    function renderClassBreakdownTable(detections, total) {
+        const tbody = document.getElementById('classBreakdownTableBody');
+        const distinctLabel = document.getElementById('distinctCategoriesCount');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        const classMap = {};
+        detections.forEach(det => {
+            const cls = det.effnet_class || det.class || 'Unknown';
+            if (!classMap[cls]) {
+                classMap[cls] = { total: 0, confirmed: 0, uncertain: 0 };
+            }
+            classMap[cls].total += 1;
+            if (det.is_uncertain) {
+                classMap[cls].uncertain += 1;
             } else {
-                classSummaryTags.innerHTML = '<span class="text-muted" style="font-size:0.85rem">No defect classes detected</span>';
+                classMap[cls].confirmed += 1;
             }
+        });
+
+        const sortedEntries = Object.entries(classMap).sort((a, b) => b[1].total - a[1].total);
+        if (distinctLabel) {
+            distinctLabel.textContent = `${sortedEntries.length} Unique Categories`;
         }
 
-        // Table Filtering & Sorting
-        function getFilteredDetections() {
-            let list = [...currentDetections];
-
-            // Search filter: Strictly matches predicted class name (e.g. 'black' matches 'BLACK' and 'Uncertain (BLACK)')
-            const searchVal = (tableSearchInput ? tableSearchInput.value : '').trim().toLowerCase();
-            if (searchVal) {
-                list = list.filter(d => {
-                    const predClass = (d.effnet_class || '').toLowerCase();
-                    const fullLabel = (d.class || '').toLowerCase();
-                    // Matches if search term matches the predicted class name or the display label
-                    return predClass.includes(searchVal) || fullLabel.includes(searchVal);
-                });
-            }
-
-            // Status filter
-            const statusVal = tableStatusFilter ? tableStatusFilter.value : 'all';
-            if (statusVal === 'confirmed') {
-                list = list.filter(d => !d.is_uncertain);
-            } else if (statusVal === 'uncertain') {
-                list = list.filter(d => d.is_uncertain === true);
-            }
-
-            // Sort
-            const sortVal = tableSortSelect ? tableSortSelect.value : 'id_asc';
-            list.sort((a, b) => {
-                if (sortVal === 'id_asc') {
-                    return (a.id || 0) - (b.id || 0);
-                } else if (sortVal === 'conf_desc') {
-                    const cA = a.effnet_confidence !== undefined ? a.effnet_confidence : a.confidence;
-                    const cB = b.effnet_confidence !== undefined ? b.effnet_confidence : b.confidence;
-                    return cB - cA;
-                } else if (sortVal === 'conf_asc') {
-                    const cA = a.effnet_confidence !== undefined ? a.effnet_confidence : a.confidence;
-                    const cB = b.effnet_confidence !== undefined ? b.effnet_confidence : b.confidence;
-                    return cA - cB;
-                } else if (sortVal === 'yolo_desc') {
-                    return (b.yolo_confidence || 0) - (a.yolo_confidence || 0);
-                }
-                return 0;
-            });
-
-            return list;
+        if (sortedEntries.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted); padding: 1.5rem;">No defects detected.</td></tr>';
+            return;
         }
 
-        function renderFilteredTable() {
-            detectionsTableBody.innerHTML = '';
-            const filtered = getFilteredDetections();
+        sortedEntries.forEach(([cls, stats]) => {
+            const sharePct = total > 0 ? ((stats.total / total) * 100).toFixed(1) : '0.0';
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><span class="class-badge">${cls}</span></td>
+                <td><strong>${stats.total}</strong></td>
+                <td><span style="color: var(--confirmed-color); font-weight: 600;">${stats.confirmed}</span></td>
+                <td><span style="color: var(--uncertain-color); font-weight: 600;">${stats.uncertain}</span></td>
+                <td>
+                    <div class="percent-bar-container">
+                        <div class="percent-bar-bg">
+                            <div class="percent-bar-fill" style="width: ${sharePct}%;"></div>
+                        </div>
+                        <span class="percent-text">${sharePct}%</span>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
 
-            if (filtered.length > 0) {
-                filtered.forEach(det => {
-                    const row = document.createElement('tr');
-                    const bboxStr = (det.bbox && det.bbox.length === 4)
-                        ? `[${det.bbox.map(n => Math.round(n)).join(', ')}]`
-                        : 'N/A';
-                    const effnetPct = det.confidence_percent || `${Math.round((det.effnet_confidence || 0) * 100)}%`;
-                    const yoloPct = det.yolo_confidence !== undefined ? `${Math.round(det.yolo_confidence * 100)}%` : 'N/A';
-                    const isUncertain = det.is_uncertain === true;
+    function renderConfidenceSummary(detections) {
+        const elMeanEff = document.getElementById('statMeanEffNet');
+        const elMaxEff = document.getElementById('statMaxEffNet');
+        const elMinEff = document.getElementById('statMinEffNet');
+        const elMeanYolo = document.getElementById('statMeanYolo');
+        const elConfMean = document.getElementById('statConfirmedMean');
+        const elUncertMean = document.getElementById('statUncertainMean');
 
-                    const statusBadge = isUncertain
-                        ? `<span class="status-badge status-uncertain"><i class="fa-solid fa-circle-question"></i> Uncertain</span>`
-                        : `<span class="status-badge status-confirmed"><i class="fa-solid fa-circle-check"></i> Confirmed</span>`;
+        if (!detections || detections.length === 0) return;
 
-                    row.innerHTML = `
-                        <td><strong>${det.id}</strong></td>
-                        <td><span class="class-badge">${det.class}</span></td>
-                        <td><strong>${effnetPct}</strong></td>
-                        <td><span>${yoloPct}</span></td>
-                        <td>${statusBadge}</td>
-                        <td class="bbox-cell">${bboxStr}</td>
-                    `;
-                    detectionsTableBody.appendChild(row);
-                });
-            } else {
-                detectionsTableBody.innerHTML = `
-                    <tr>
-                        <td colspan="6" style="text-align:center; color: var(--text-muted); padding: 2rem;">
-                            <i class="fa-solid fa-filter-circle-xmark" style="font-size:1.5rem; display:block; margin-bottom:0.5rem; color:var(--text-muted);"></i>
-                            No matching detections found for the selected filter or search criteria.
-                        </td>
-                    </tr>
-                `;
-            }
-        }
+        const effConfs = detections.map(d => d.effnet_confidence !== undefined ? d.effnet_confidence : (d.confidence || 0));
+        const yoloConfs = detections.map(d => d.yolo_confidence !== undefined ? d.yolo_confidence : 0);
+        const confirmedConfs = detections.filter(d => !d.is_uncertain).map(d => d.effnet_confidence !== undefined ? d.effnet_confidence : (d.confidence || 0));
+        const uncertainConfs = detections.filter(d => d.is_uncertain).map(d => d.effnet_confidence !== undefined ? d.effnet_confidence : (d.confidence || 0));
 
-        function resetTableFilters() {
-            if (tableSearchInput) tableSearchInput.value = '';
-            if (tableStatusFilter) tableStatusFilter.value = 'all';
-            if (tableSortSelect) tableSortSelect.value = 'id_asc';
-        }
+        const avg = arr => arr.length > 0 ? (arr.reduce((s, v) => s + v, 0) / arr.length) : 0;
+        const max = arr => arr.length > 0 ? Math.max(...arr) : 0;
+        const min = arr => arr.length > 0 ? Math.min(...arr) : 0;
 
-        // Table Filter Event Listeners
-        if (tableSearchInput) tableSearchInput.addEventListener('input', renderFilteredTable);
-        if (tableStatusFilter) tableStatusFilter.addEventListener('change', renderFilteredTable);
-        if (tableSortSelect) tableSortSelect.addEventListener('change', renderFilteredTable);
-        if (btnResetFilters) {
-            btnResetFilters.addEventListener('click', () => {
-                resetTableFilters();
-                renderFilteredTable();
-            });
-        }
-
-        // Feature 3: Export CSV Button (Separate 9 Columns)
-        if (btnExportCsv) {
-            btnExportCsv.addEventListener('click', () => {
-                if (!currentDetections || currentDetections.length === 0) {
-                    alert('No detections available to export. Run an analysis first.');
-                    return;
-                }
-
-                const headers = [
-                    'Detection ID',
-                    'Predicted Class',
-                    'Classifier Confidence',
-                    'YOLO Confidence',
-                    'Status',
-                    'x1',
-                    'y1',
-                    'x2',
-                    'y2'
-                ];
-
-                const rows = currentDetections.map(d => {
-                    const id = d.id;
-                    const pClass = `"${(d.class || '').replace(/"/g, '""')}"`;
-                    const effConf = d.effnet_confidence !== undefined ? Number(d.effnet_confidence).toFixed(4) : Number(d.confidence || 0).toFixed(4);
-                    const yoloConf = d.yolo_confidence !== undefined ? Number(d.yolo_confidence).toFixed(4) : '';
-                    const status = d.is_uncertain ? 'Uncertain' : 'Confirmed';
-                    const bbox = d.bbox || [0, 0, 0, 0];
-                    const x1 = bbox[0] !== undefined ? bbox[0] : '';
-                    const y1 = bbox[1] !== undefined ? bbox[1] : '';
-                    const x2 = bbox[2] !== undefined ? bbox[2] : '';
-                    const y2 = bbox[3] !== undefined ? bbox[3] : '';
-
-                    return [id, pClass, effConf, yoloConf, status, x1, y1, x2, y2].join(',');
-                });
-
-                const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows].join('\n');
-                const encodedUri = encodeURI(csvContent);
-                const link = document.createElement('a');
-                link.setAttribute('href', encodedUri);
-                const sampleName = selectedFile ? selectedFile.name.replace(/\.[^/.]+$/, '') : 'sample';
-                link.setAttribute('download', `coffee_defect_analysis_${sampleName}.csv`);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            });
-        }
+        if (elMeanEff) elMeanEff.textContent = `${(avg(effConfs) * 100).toFixed(1)}%`;
+        if (elMaxEff) elMaxEff.textContent = `${(max(effConfs) * 100).toFixed(1)}%`;
+        if (elMinEff) elMinEff.textContent = `${(min(effConfs) * 100).toFixed(1)}%`;
+        if (elMeanYolo) elMeanYolo.textContent = `${(avg(yoloConfs) * 100).toFixed(1)}%`;
+        if (elConfMean) elConfMean.textContent = `${(avg(confirmedConfs) * 100).toFixed(1)}%`;
+        if (elUncertMean) elUncertMean.textContent = uncertainConfs.length > 0 ? `${(avg(uncertainConfs) * 100).toFixed(1)}%` : 'N/A';
+    }
 });

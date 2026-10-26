@@ -114,6 +114,9 @@ document.addEventListener('DOMContentLoaded', () => {
         clearCurrentAnalysis();
         emptyState.classList.remove('hidden');
         resultsContainer.classList.add('hidden');
+        sessionStorage.removeItem('coffeeAnalysis');
+        const btnViewDashboard = document.getElementById('btnViewDashboard');
+        if (btnViewDashboard) btnViewDashboard.classList.add('hidden');
     }
 
     // Tab Switching
@@ -521,5 +524,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 link.click();
                 document.body.removeChild(link);
             });
+        }
+
+        // 9. Restore State from sessionStorage if returning to Inspection page
+        try {
+            const savedRaw = sessionStorage.getItem('coffeeAnalysis');
+            if (savedRaw) {
+                const saved = JSON.parse(savedRaw);
+                if (saved && saved.data) {
+                    if (confSlider && saved.yoloThresh) {
+                        confSlider.value = saved.yoloThresh;
+                        confValueDisplay.textContent = `${saved.yoloThresh}%`;
+                    }
+                    if (effnetConfSlider && saved.effnetThresh) {
+                        effnetConfSlider.value = saved.effnetThresh;
+                        effnetConfValueDisplay.textContent = `${saved.effnetThresh}%`;
+                    }
+                    if (saved.sampleName && fileNameDisplay) {
+                        fileNameDisplay.innerHTML = `<i class="fa-solid fa-file-image"></i> ${saved.sampleName}`;
+                    }
+                    renderResults(saved.data, saved.elapsedMs || 0);
+                    // Also preview original image if available
+                    if (saved.data.original_image_url && imagePreview) {
+                        imagePreview.src = `${saved.data.original_image_url}?t=${Date.now()}`;
+                        dropzoneContent.classList.add('hidden');
+                        previewContainer.classList.remove('hidden');
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('Could not restore analysis state:', e);
         }
 });
